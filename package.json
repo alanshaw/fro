@@ -1,0 +1,23 @@
+{
+  "name": "fro",
+  "version": "0.0.0-pre.0",
+  "description": "Like grunt, but simple stream and transform all the things",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/alanshaw/fro.git"
+  },
+  "author": "Alan Shaw",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/alanshaw/fro/issues"
+  },
+  "dependencies": {
+    "optimist": "~0.6.0",
+    "pull-glob": "~1.0.1",
+    "pull-stream": "~2.20.1"
+  }
+}
