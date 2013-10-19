@@ -61,5 +61,5 @@ Create a config file that looks like:
 Then, run the brfs task against the files you specify in your config JSON file:
 
 ```sh
-fro --task brfs -c brfs.json
+fro --task brfs --config brfs.json
 ```
