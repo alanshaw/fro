@@ -5,18 +5,35 @@ var fs = require("fs")
   , pull = require("pull-stream")
   , glob = require("pull-glob")
   , mkdirp = require("mkdirp")
+  , depGraph = require("../lib/dep-graph")
 
 var argv = require("optimist")
   .usage("Stream run frontend tasks.\nUsage: $0")
-  .demand(["t", "c"])
   .alias("t", "task")
   .alias("c", "config")
   .describe("t", "Task name to run")
   .describe("c", "Config JSON file to load")
   .argv
 
-var task = require(path.join(process.cwd(), "node_modules", argv.t))
+var tasks = {}
   , config = JSON.parse(fs.readFileSync(argv.c))
+
+// Require tasks and add task name to all instances
+Object.keys(config).forEach(function (taskName) {
+  tasks[taskName] = require(path.join(process.cwd(), "node_modules", taskName))
+
+  if (Object.keys(config[taskName]).indexOf("src") == -1) {
+    return Object.keys(config[taskName]).forEach(function (instanceName) {
+      config[taskName][instanceName]._froTaskName = taskName
+    })
+  }
+
+  config[taskName]._froTaskName = taskName
+})
+
+var graph = depGraph.create(config)
+
+depGraph.print(graph)
 
 var globsProcessed = false
   , tasksTotal = 0
