@@ -55,7 +55,7 @@ Create a config file that looks like:
 ```
 
 * `src` is a glob specifying files you want to run the task on
-* `dest` is the directory you want to save the output from the files to
+* `dest` (optional) is the directory you want to save the output from the files to
 * The whole config object is passed to the task as the second param so you can include any other task specific options you like in an `options` property, or whatever.
 
 Then, run the brfs task against the files you specify in your config JSON file:
