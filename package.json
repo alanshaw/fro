@@ -1,6 +1,6 @@
 {
   "name": "fro",
-  "version": "0.0.0-pre.0",
+  "version": "0.0.0-pre.1",
   "description": "Like grunt, but simple stream and transform all the things",
   "main": "index.js",
   "scripts": {
