@@ -18,16 +18,33 @@ var argv = require("optimist")
 var task = require(path.join(process.cwd(), "node_modules", argv.t))
   , config = JSON.parse(fs.readFileSync(argv.c))
 
+var globsProcessed = false
+  , tasksTotal = 0
+  , tasksDone = 0
+
+function onTaskDone () {
+  console.log("Task done")
+  tasksDone++
+  if (globsProcessed && tasksDone == tasksTotal) {
+    console.log("ALL DONE")
+  }
+}
+
 var globProcessingStream = pull.Sink(function (read) {
   read(null, function next (end, file) {
-    if (end) return console.log("Finished processing globs")
-    console.log("Processing:", file)
-
-    if (!dest) {
-      return fs.createReadStream(file).pipe(task(file, config))
+    if (end) {
+      globsProcessed = true
+      return console.log("Finished processing globs")
     }
 
+    console.log("Processing:", file)
+    tasksTotal++
+
     var dest = path.join(config.dest, file)
+
+    if (!dest) {
+      return fs.createReadStream(file).pipe(task(file, config)).on("end", onTaskDone)
+    }
 
     mkdirp(path.dirname(dest), function (er) {
       if (er) throw er
@@ -35,6 +52,7 @@ var globProcessingStream = pull.Sink(function (read) {
       fs.createReadStream(file)
         .pipe(task(file, config))
         .pipe(fs.createWriteStream(dest))
+        .on("finish", onTaskDone)
     })
 
     // Continue reading the files
