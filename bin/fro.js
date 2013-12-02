@@ -5,7 +5,9 @@ var fs = require("fs")
   , pull = require("pull-stream")
   , glob = require("pull-glob")
   , mkdirp = require("mkdirp")
+  , async = require("async")
   , depGraph = require("../lib/dep-graph")
+  , CombinedStream = require("combined-stream")
 
 var argv = require("optimist")
   .usage("Stream run frontend tasks.\nUsage: $0")
@@ -18,11 +20,17 @@ var argv = require("optimist")
 var tasks = {}
   , config = JSON.parse(fs.readFileSync(argv.c))
 
+function isMultiTask (taskConfig) {
+  var keys = Object.keys(taskConfig)
+  return keys.indexOf("src") == -1 && keys.indexOf("dest") == -1 && keys.indexOf("depends") == -1
+}
+
 // Require tasks and add task name to all instances
 Object.keys(config).forEach(function (taskName) {
+  console.log("Loading task", taskName + "...")
   tasks[taskName] = require(path.join(process.cwd(), "node_modules", taskName))
 
-  if (Object.keys(config[taskName]).indexOf("src") == -1) {
+  if (isMultiTask(config[taskName])) {
     return Object.keys(config[taskName]).forEach(function (instanceName) {
       config[taskName][instanceName]._froTaskName = taskName
     })
@@ -35,47 +43,65 @@ var graph = depGraph.create(config)
 
 depGraph.print(graph)
 
-var globsProcessed = false
-  , tasksTotal = 0
-  , tasksDone = 0
-
-function onTaskDone () {
-  console.log("Task done")
-  tasksDone++
-  if (globsProcessed && tasksDone == tasksTotal) {
-    console.log("ALL DONE")
-  }
+function subtaskConfigs (taskConfig) {
+  // TODO: Get subtasks for a task
+  return []
 }
 
-var globProcessingStream = pull.Sink(function (read) {
-  read(null, function next (end, file) {
-    if (end) {
-      globsProcessed = true
-      return console.log("Finished processing globs")
+function createTaskPipeline (fromStream, taskConfigs) {
+  return taskConfigs.map(function (taskConfig) {
+    var subtaskConfigs = subtaskConfigs(taskConfig)
+      , task = tasks[taskConfig._froTaskName]
+
+    if (!subtaskConfigs.length) {
+      return fromStream.pipe(task(taskConfig))
     }
 
-    console.log("Processing:", file)
-    tasksTotal++
+    return createTaskPipeline(fromStream.pipe(task(taskConfig)), subtaskConfigs)
+  })
+}
 
-    var dest = path.join(config.dest, file)
+function flatten (array) {
+  return array.reduce(function (flattened, o) {
+    return flattened.concat(Array.isArray(o) ? flatten(o) : o)
+  }, [])
+}
 
-    if (!dest) {
-      return fs.createReadStream(file).pipe(task(file, config)).on("end", onTaskDone)
-    }
+// Get the top level tasks
+var runners = graph.overallOrder(true).map(function (taskConfig) {
+  return function (cb) {
+    var globStream = glob(taskConfig.src)
+      , sourceStream = CombinedStream.create()
 
-    mkdirp(path.dirname(dest), function (er) {
-      if (er) throw er
-      // Pipe file data to task, then save to dest
-      fs.createReadStream(file)
-        .pipe(task(file, config))
-        .pipe(fs.createWriteStream(dest))
-        .on("finish", onTaskDone)
+    globStream.on("data", function (file) {
+      sourceStream.append(fs.createReadStream(file))
     })
 
-    // Continue reading the files
-    read(null, next)
-  })
+    globStream.on("end", function () {
+      var pipeline = createTaskPipeline(sourceStream, [taskConfig])
+
+      // pipeline is an array of streams/arrays of streams - make flatten
+      // [stream, [stream, stream], stream, [stream, [stream, stream], stream]]
+      pipeline = flatten(pipeline)
+
+      var writeTasks = pipeline.map(function (stream, i) {
+        return function (cb) {
+          var taskConfig = depGraph.overallOrder()[i]
+
+
+
+          var writeStream = fs.createWriteStream(/* but where does it go? */)
+          writeStream.on("finish", cb)
+
+          stream.pipe(writeStream)
+        }
+      })
+
+      async.parallel(writeTasks, cb)
+    })
+  }
 })
 
-// Get src file paths and process task
-pull(glob(config.src), globProcessingStream())
+async.parallel(runners, function (er) {
+  if (er) throw er
+})

@@ -20,7 +20,9 @@
     "pull-glob": "~1.0.1",
     "pull-stream": "~2.20.1",
     "mkdirp": "~0.3.5",
-    "dependency-graph": "~0.1.0"
+    "dependency-graph": "~0.1.0",
+    "async": "~0.2.9",
+    "combined-stream": "0.0.4"
   },
   "bin": "./bin/fro.js"
 }
